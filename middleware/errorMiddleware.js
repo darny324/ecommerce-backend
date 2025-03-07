@@ -2,6 +2,7 @@ const { StatusCodes } = require("http-status-codes");
 const { CustomError } = require("../errors")
 
 const errorMiddleWare = (err, req, res, next) => {
+  console.log(err);
   const errorObject = {};
   if ( err instanceof CustomError ){
     errorObject.status = err.status; 

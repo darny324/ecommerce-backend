@@ -7,8 +7,14 @@ const { generateGeneralFilters, generateAttributeFilters } = require("./methods"
 
 //
 
-const getAllProducts = (req, res) => {
-  const {brand, name, generalFilters } = req.query;
+
+
+const getAllProducts = async (req, res) => {
+  const {name, generalFiltersname, brand, category, processor, storageType,
+    operatingSystem, resolution, generalFilters,
+    ram, storage, batteryLife 
+  } = req.query;
+  
   const ob = {};
   if ( brand ) {
     const brandList = brand.split(',');
@@ -20,118 +26,37 @@ const getAllProducts = (req, res) => {
   if ( name ) {
     ob.shortName = {$regex: name, $options: 'i'}; 
   }
-  if ( numericFilters ) {
-    const options = ['discount', 'price', 'rating'];
-    generateGeneralFilters(generalFilters, ob, options);
+  if ( generalFilters ) {
+    const options = ['discount', 'priceInCents', 'ratings'];
+    const filters = generalFilters.replace(regEx, 
+      (match) => `-${operatorMap[match]}-`
+    )
+  
+    filters.split(',').forEach((filter) => {
+      const [field, operator, value] = filter.split('-');
+      
+      if ( options.includes(field)){
+        ob[field] = { [operator]: Number(value)};
+      }
+    })
   }
 
+  const page = Number(req.query.page) || 1; 
+  const limit = Number(req.query.limit) || 8; 
+  const skip = (page - 1) * limit;
 
-  const products = Products.find(ob);
-  res.status(StatusCodes.OK).json({products: products})
+  const totalProducts = await Products.countDocuments(ob);
+  const totalPages = Math.ceil(totalProducts/limit);
+
+  const products = await Products.find(ob).skip(skip).limit(limit).sort({shortName:1});
+  
+  res.status(StatusCodes.OK).json({
+    totalPages, 
+    count:products.length, 
+    products: products, 
+  });
 }
 
-const getElectronicProducts = (req, res) => {
-  const {
-    name, brand, attributeFilters, category, processor, storageType,
-    connectivity, operatingSystem, resolution, generalFilters,
-  } = req.query; 
-  const ob = {};
-  if ( name ) ob.shortName = {$regex: name, $options: 'i'}; 
-  if ( brand ) ob.brand = brand; 
-  if ( attributeFilters ) {
-    const options = ['screenSize', 'ram', 'storage', 'batteryLife', 'warranty'];
-    generateAttributeFilters(attributeFilters, ob, options);
-  }
-  if ( generalFilters ){
-    const options = ['price', 'rating', 'discount'];
-    generateGeneralFilters(generalFilters, ob, options);
-  }
-  if (category) ob.attributes = {...ob.attributes, category: category};
-  if (processor) ob.attributes = {...ob.attributes, processor: processor};
-  if (storageType) ob.attributes = {...ob.attributes, storageType: storageType};
-  if (connectivity) ob.attributes = {...ob.attributes, connectivity: connectivity};
-  if (operatingSystem) ob.attributes = {...ob.attributes, operatingSystem: operatingSystem};
-  if (resolution) ob.attributes = {...ob.attributes, resolution: resolution};
-  const products = Products.find(ob);
-  res.status(StatusCodes.OK).json({products: products});
-}
-
-const getBooksProducts = async (req, res) => {
-  const {category, genre, author, brand, format,
-    generalFilters, name
-  } = req.query;
-
-  if ( name ) ob.shortName = {$regex: name, $options: 'i'}; 
-
-  if ( generalFilters ){
-    const options = ['price', 'rating', 'discount'];
-    generateGeneralFilters(generalFilters, ob, options);
-  }
-
-  if (category) ob.attributes = {...ob.attributes, category: category};
-  if (genre) ob.attributes = {...ob.attributes, genre: genre};
-  if (author) ob.attributes = {...ob.attributes, author: author};
-  if (format) ob.attributes = {...ob.attributes, format: format};
-  if ( brand ) ob.brand = brand;
-
-  const products = await Products.find(ob);
-  res.status(StatusCodes.OK).json({products});
-}
-
-const getSportProducts = async (req, res) => {
-  const {
-    category, brand, sportType, sizes, material, 
-    footwareType, generalFilters, colors, name
-  } = req.query;
-
-  const ob = {};
-
-  if ( name ) ob.shortName = {$regex: name, $options: 'i'}; 
-
-  if ( generalFilters ){
-    const options = ['price', 'rating', 'discount'];
-    generateGeneralFilters(generalFilters, ob, options);
-  }
-
-  if (category) ob.attributes = {...ob.attributes, category: category};
-  if (sportType) ob.attributes = {...ob.attributes, sportType: sportType};
-  if (material) ob.attributes = {...ob.attributes, material: material};
-  if (footwareType) ob.attributes = {...ob.attributes, footwareType: footwareType};
-  if (sizes) ob.options = {...ob.options, sizes: { $in: [...sizes]}};
-  if (colors) ob.options = {...ob.options, colors: { $in: [...colors]}};
-  if (brand) ob.brand = brand;
-
-  const products = await Products.find(ob);
-  res.status(StatusCodes.OK).json({products});
-}
-
-const getClothingProducts = async (req, res) => {
-  const {
-    category, sizes, brand, colors, generalFilters, 
-    material, gender, pattern, sleeveLength, occasion, name
-  } = req.query;
-
-  const ob = {};
-
-  if ( name ) ob.shortName = {$regex: name, $options: 'i'}; 
-  if ( generalFilters ){
-    const options = ['price', 'rating', 'discount'];
-    generateGeneralFilters(generalFilters, ob, options);
-  }
-
-  if (category) ob.attributes = {...ob.attributes, category: category};
-  if (gender) ob.attributes = {...ob.attributes, gender: gender};
-  if (material) ob.attributes = {...ob.attributes, material: material};
-  if (pattern) ob.attributes = {...ob.attributes, pattern: pattern};
-  if (sleeveLength) ob.attributes = {...ob.attributes, sleeveLength: sleeveLength};
-  if (occasion) ob.attributes = {...ob.attributes, occasion: occasion};
-  if (sizes) ob.options = {...ob.options, sizes: { $in: [...sizes]}};
-  if (colors) ob.options = {...ob.options, colors: { $in: [...colors]}};
-  if (brand) ob.brand = brand;
-
-  const products = await User.find(ob);
-  res.status(StatusCodes.OK).json({products});
-}
 
 const getProduct = async (req, res) => {
   const {id:productId} = req.params; 
@@ -143,7 +68,8 @@ const getProduct = async (req, res) => {
 }
 
 const addProduct = async (req, res) => {
-  const {attributes, name, shortName, description, options, productType, 
+  const {
+    attributes, name, shortName, description, options, 
     priceInCents, brand, totalStock, features, imageUrls, discount, returnPolicy
   } = req.body;
 
@@ -217,10 +143,6 @@ const deleteProduct = async (req, res) => {
 
 module.exports = {
   getAllProducts, 
-  getElectronicProducts, 
-  getBooksProducts, 
-  getSportProducts, 
-  getClothingProducts, 
   getProduct, 
   addProduct, 
   updateProduct, 

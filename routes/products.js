@@ -6,11 +6,18 @@ const router = app.Router();
 
 router.route('/')
 .get(getAllProducts)
-.get(getElectronicProducts)
-.get(getBooksProducts)
-.get(getSportProducts)
-.get(getClothingProducts)
 .post(upload.array('images', 5), uploadImages, addProduct);
+
+router.route('/electronics').get(getElectronicProducts);
+
+router.route('/books').get(getBooksProducts);
+
+router.route('/sports').get(getSportProducts);
+
+router.route('/clothes').get(getClothingProducts);
+
+
+
 
 router.route('/:id')
 .get(getProduct)

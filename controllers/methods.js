@@ -1,9 +1,3 @@
-
-
-const generateOTP = () =>  {
-  return Math.round((100000 + Math.random() * 900000)).toString();
-}
-
 const regEx = /\b(<|>|>=|=|<=)\b/g;
 const operatorMap = {
   '<': '$lt', 
@@ -12,6 +6,12 @@ const operatorMap = {
   '=': '$eq', 
   '<=': '$lte'
 };
+
+const generateOTP = () =>  {
+  return Math.round((100000 + Math.random() * 900000)).toString();
+}
+
+
 
 const generateAttributeFilters = (numericFilters, ob, options) => {
   const filters = numericFilters.replace(regEx, 
@@ -37,8 +37,9 @@ const generateGeneralFilters = (numericFilters, ob, options) => {
     (match) => `-${operatorMap[match]}-`
   )
 
-  filters.split(',').map((filter) => {
-    const {field, operator, value} = filter.split('-');
+  filters.split(',').forEach((filter) => {
+    const [field, operator, value] = filter.split('-');
+    
     if ( options.includes(field)){
       ob[field] = { [operator]: Number(value)};
     }

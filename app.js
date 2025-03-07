@@ -3,10 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const {Server} = require('socket.io');
+
+
 const { userRouter, productRouter } = require('./routes');
 const { errorMiddleWare } = require('./middleware/errorMiddleware');
 const connectDB = require('./db/connect');
 const { connectRedis } = require('./redis');
+const Products = require('./models/products');
+const { products } = require('./sample_products');
 require('express-async-errors');
 
 const app = express();
@@ -35,17 +39,26 @@ app.use('/api/v1/ecommerce/users', userRouter);
 app.use('/api/v1/ecommerce/products', productRouter);
 app.use(errorMiddleWare);
 
-const start = async () => {
+async function start(){
   try {
     await connectDB(process.env.MONGO_URI);
     await connectRedis();
-
     app.listen(process.env.PORT, () => {
-      console.log("Server is listening on " + process.env.PORT);
-    });
+      console.log("SERVER is listening on PORT " + process.env.PORT);
+    })
   } catch (err) {
     console.log(err);
   }
+}
+
+async function fillDB(){
+  try {
+    await Products.deleteMany({});
+    await Products.create(products);
+  } catch (err) {
+    console.log("ERROR in filling database", err);
+  }
+  
 }
 
 start();
