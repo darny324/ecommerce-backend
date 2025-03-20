@@ -3,135 +3,66 @@
 const { StatusCodes } = require("http-status-codes");
 const Products = require("../models/products");
 const {BadRequest, CustomError} = require('../errors');
-const { generateGeneralFilters, generateAttributeFilters } = require("./methods");
 
 //
 
 const getAllProducts = (req, res) => {
-  const {brand, name, generalFilters } = req.query;
+  const {name, numericFilters, 
+    brand, releaseYear, warranty, processor, ram, storage, batteryLife, 
+    chargingType, resolution, material, category, 
+  } = req.query;
   const ob = {};
-  if ( brand ) {
-    const brandList = brand.split(',');
-    ob.brand = {
-      $in: [...brandList],
-    }
-  }
 
   if ( name ) {
     ob.shortName = {$regex: name, $options: 'i'}; 
   }
-  if ( numericFilters ) {
-    const options = ['discount', 'price', 'rating'];
-    generateGeneralFilters(generalFilters, ob, options);
+
+  if (brand) { ob['attributes.brand'] = { $regex: brand, $options: 'i'}};
+  if (releaseYear) { ob['attributes.releaseYear'] = releaseYear };
+  if (warranty) { ob['attributes.warranty'] = { $regex: warranty, $options: 'i'}};
+  if (processor) { ob['attributes.processor'] = { $regex: processor, $options: 'i'}};
+  if (ram) { ob['attributes.ram'] = { $regex: ram, $options: 'i'}};
+  if (storage) { ob['attributes.storage'] = { $regex: storage, $options: 'i'}};
+  if (batteryLife) { ob['attributes.batteryLife'] = { $regex: batteryLife, $options: 'i'}};
+  if (chargingType) { ob['attributes.chargingType'] = { $regex: chargingType, $options: 'i'}};
+  if (resolution) { ob['attributes.resolution'] = { $regex: resolution, $options: 'i'}};
+  if (material) { ob['attributes.material'] = { $regex: material, $options: 'i'}};
+  if (category) { 
+    ob.category = category;
   }
 
+  if ( numericFilters ) {
+    const options = ['discount', 'price', 'rating'];
+    const regEx = /\b(<|>|>=|=|<=)\b/g;
+    const operatorMap = {
+      '<': '$lt', 
+      '>': '$gt', 
+      '>=': '$gte', 
+      '=': '$eq', 
+      '<=': '$lte'
+    };
 
-  const products = Products.find(ob);
+    const filters = numericFilters.replace(regEx, 
+      (match) => `-${operatorMap[match]}-`
+    )
+  
+    filters.split(',').map((filter) => {
+      const {field, operator, value} = filter.split('-');
+      if ( options.includes(field)){
+        ob[field] = { [operator]: Number(value)};
+      }
+    })
+  }
+
+  const page = req.query.page ? Number(req.query.page) : 1;
+  const limit = req.query.limit ? Number(req.query.limit) : 5;
+
+  const skip = (page - 1) * limit;
+
+  const products = Products.find(ob).skip(skip).limit(limit);
   res.status(StatusCodes.OK).json({products: products})
 }
 
-const getElectronicProducts = (req, res) => {
-  const {
-    name, brand, attributeFilters, category, processor, storageType,
-    connectivity, operatingSystem, resolution, generalFilters,
-  } = req.query; 
-  const ob = {};
-  if ( name ) ob.shortName = {$regex: name, $options: 'i'}; 
-  if ( brand ) ob.brand = brand; 
-  if ( attributeFilters ) {
-    const options = ['screenSize', 'ram', 'storage', 'batteryLife', 'warranty'];
-    generateAttributeFilters(attributeFilters, ob, options);
-  }
-  if ( generalFilters ){
-    const options = ['price', 'rating', 'discount'];
-    generateGeneralFilters(generalFilters, ob, options);
-  }
-  if (category) ob.attributes = {...ob.attributes, category: category};
-  if (processor) ob.attributes = {...ob.attributes, processor: processor};
-  if (storageType) ob.attributes = {...ob.attributes, storageType: storageType};
-  if (connectivity) ob.attributes = {...ob.attributes, connectivity: connectivity};
-  if (operatingSystem) ob.attributes = {...ob.attributes, operatingSystem: operatingSystem};
-  if (resolution) ob.attributes = {...ob.attributes, resolution: resolution};
-  const products = Products.find(ob);
-  res.status(StatusCodes.OK).json({products: products});
-}
-
-const getBooksProducts = async (req, res) => {
-  const {category, genre, author, brand, format,
-    generalFilters, name
-  } = req.query;
-
-  if ( name ) ob.shortName = {$regex: name, $options: 'i'}; 
-
-  if ( generalFilters ){
-    const options = ['price', 'rating', 'discount'];
-    generateGeneralFilters(generalFilters, ob, options);
-  }
-
-  if (category) ob.attributes = {...ob.attributes, category: category};
-  if (genre) ob.attributes = {...ob.attributes, genre: genre};
-  if (author) ob.attributes = {...ob.attributes, author: author};
-  if (format) ob.attributes = {...ob.attributes, format: format};
-  if ( brand ) ob.brand = brand;
-
-  const products = await Products.find(ob);
-  res.status(StatusCodes.OK).json({products});
-}
-
-const getSportProducts = async (req, res) => {
-  const {
-    category, brand, sportType, sizes, material, 
-    footwareType, generalFilters, colors, name
-  } = req.query;
-
-  const ob = {};
-
-  if ( name ) ob.shortName = {$regex: name, $options: 'i'}; 
-
-  if ( generalFilters ){
-    const options = ['price', 'rating', 'discount'];
-    generateGeneralFilters(generalFilters, ob, options);
-  }
-
-  if (category) ob.attributes = {...ob.attributes, category: category};
-  if (sportType) ob.attributes = {...ob.attributes, sportType: sportType};
-  if (material) ob.attributes = {...ob.attributes, material: material};
-  if (footwareType) ob.attributes = {...ob.attributes, footwareType: footwareType};
-  if (sizes) ob.options = {...ob.options, sizes: { $in: [...sizes]}};
-  if (colors) ob.options = {...ob.options, colors: { $in: [...colors]}};
-  if (brand) ob.brand = brand;
-
-  const products = await Products.find(ob);
-  res.status(StatusCodes.OK).json({products});
-}
-
-const getClothingProducts = async (req, res) => {
-  const {
-    category, sizes, brand, colors, generalFilters, 
-    material, gender, pattern, sleeveLength, occasion, name
-  } = req.query;
-
-  const ob = {};
-
-  if ( name ) ob.shortName = {$regex: name, $options: 'i'}; 
-  if ( generalFilters ){
-    const options = ['price', 'rating', 'discount'];
-    generateGeneralFilters(generalFilters, ob, options);
-  }
-
-  if (category) ob.attributes = {...ob.attributes, category: category};
-  if (gender) ob.attributes = {...ob.attributes, gender: gender};
-  if (material) ob.attributes = {...ob.attributes, material: material};
-  if (pattern) ob.attributes = {...ob.attributes, pattern: pattern};
-  if (sleeveLength) ob.attributes = {...ob.attributes, sleeveLength: sleeveLength};
-  if (occasion) ob.attributes = {...ob.attributes, occasion: occasion};
-  if (sizes) ob.options = {...ob.options, sizes: { $in: [...sizes]}};
-  if (colors) ob.options = {...ob.options, colors: { $in: [...colors]}};
-  if (brand) ob.brand = brand;
-
-  const products = await User.find(ob);
-  res.status(StatusCodes.OK).json({products});
-}
 
 const getProduct = async (req, res) => {
   const {id:productId} = req.params; 
@@ -159,12 +90,11 @@ const addProduct = async (req, res) => {
   ob.productType = productType;
 
   if ( !priceInCents ) throw new BadRequest("Price is not provided");
-  ob.priceInCents = priceInCents;
+  ob.price = price;
 
   if (description) ob.description = description;
   if (options) ob.options = options;
-  if (brand) ob.brand = brand; 
-  if (totalStock) ob.totalStock = totalStock;
+  if (quantity) ob.quantity = quantity;
   if (features) ob.features = features;
   if (imageUrls) ob.images = imageUrls;
   if (discount) ob.discount = discount;
@@ -180,8 +110,8 @@ const addProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   const {
-    priceInCents, discount, totalStock, options, attributes, features, 
-    returnPolicy, name, shortName, brand, description
+    price, discount, quantity, options, attributes, features, 
+    returnPolicy, name, shortName, category, description
   } = req.body;
 
   const {id:productId} = req.params;
@@ -189,12 +119,12 @@ const updateProduct = async (req, res) => {
   const ob = {};
   if ( name ) ob.name = name; 
   if ( shortName ) ob.shortName = shortName; 
-  if ( priceInCents ) ob.priceInCents = priceInCents;
+  if ( price ) ob.price = price;
   if (description) ob.description = description;
   if (options) ob.options = options;
   if (attributes) ob.attributes = attributes;
-  if (brand) ob.brand = brand; 
-  if (totalStock) ob.totalStock = totalStock;
+  if (quantity) ob.quantity = quantity;
+  if (category) ob.category = category;
   if (features) ob.features = features;
   if (discount) ob.discount = discount;
   if ( returnPolicy ) ob.returnPolicy = returnPolicy;
@@ -217,10 +147,6 @@ const deleteProduct = async (req, res) => {
 
 module.exports = {
   getAllProducts, 
-  getElectronicProducts, 
-  getBooksProducts, 
-  getSportProducts, 
-  getClothingProducts, 
   getProduct, 
   addProduct, 
   updateProduct, 
