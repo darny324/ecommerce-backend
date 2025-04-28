@@ -6,10 +6,10 @@ const {BadRequest, CustomError} = require('../errors');
 
 //
 
-const getAllProducts = (req, res) => {
+const getAllProducts = async (req, res) => {
   const {name, numericFilters, 
-    brand, releaseYear, warranty, processor, ram, storage, batteryLife, 
-    chargingType, resolution, material, category, 
+    brands, releaseYear, warranty, processor, ram, storage, batteryLife, 
+    chargingType, resolution, material, category, sortBy
   } = req.query;
   const ob = {};
 
@@ -17,7 +17,10 @@ const getAllProducts = (req, res) => {
     ob.shortName = {$regex: name, $options: 'i'}; 
   }
 
-  if (brand) { ob['attributes.brand'] = { $regex: brand, $options: 'i'}};
+  if (brands) {
+    const b = brands.split(','); 
+    ob['attributes.brand'] = { $regex: [...b], $options: 'i'}
+  };
   if (releaseYear) { ob['attributes.releaseYear'] = releaseYear };
   if (warranty) { ob['attributes.warranty'] = { $regex: warranty, $options: 'i'}};
   if (processor) { ob['attributes.processor'] = { $regex: processor, $options: 'i'}};
@@ -28,7 +31,7 @@ const getAllProducts = (req, res) => {
   if (resolution) { ob['attributes.resolution'] = { $regex: resolution, $options: 'i'}};
   if (material) { ob['attributes.material'] = { $regex: material, $options: 'i'}};
   if (category) { 
-    ob.category = category;
+    ob.category = {$regex: category, $options: 'i'};
   }
 
   if ( numericFilters ) {
@@ -47,7 +50,7 @@ const getAllProducts = (req, res) => {
     )
   
     filters.split(',').map((filter) => {
-      const {field, operator, value} = filter.split('-');
+      const [field, operator, value] = filter.split('-');
       if ( options.includes(field)){
         ob[field] = { [operator]: Number(value)};
       }
@@ -59,7 +62,7 @@ const getAllProducts = (req, res) => {
 
   const skip = (page - 1) * limit;
 
-  const products = Products.find(ob).skip(skip).limit(limit);
+  const products = await Products.find(ob).skip(skip).limit(limit).sort(sortBy);
   res.status(StatusCodes.OK).json({products: products})
 }
 
@@ -74,8 +77,8 @@ const getProduct = async (req, res) => {
 }
 
 const addProduct = async (req, res) => {
-  const {attributes, name, shortName, description, options, productType, 
-    priceInCents, brand, totalStock, features, imageUrls, discount, returnPolicy
+  const {attributes, name, shortName, description, options, category, 
+    price, quantity, features, images, discount, returnPolicy, reviews
   } = req.body;
 
   const ob = {};
@@ -86,20 +89,33 @@ const addProduct = async (req, res) => {
   if ( !shortName ) throw new BadRequest("Short Name is not provided");
   ob.shortName = shortName;
 
-  if ( !productType ) throw new BadRequest("product type is not provided");
-  ob.productType = productType;
+  
 
-  if ( !priceInCents ) throw new BadRequest("Price is not provided");
+  if ( !category ) throw new BadRequest("product type is not provided");
+  ob.category = category;
+
+  if ( !price ) throw new BadRequest("Price is not provided");
   ob.price = price;
 
   if (description) ob.description = description;
   if (options) ob.options = options;
   if (quantity) ob.quantity = quantity;
   if (features) ob.features = features;
-  if (imageUrls) ob.images = imageUrls;
+  if (images) ob.images = images;
   if (discount) ob.discount = discount;
   if ( returnPolicy ) ob.returnPolicy = returnPolicy;
-  
+
+  if ( reviews ){
+    ob.reviews = reviews;
+    ob.totalReviews = reviews.length();
+    let sum;
+    for ( let i = 0; i < reviews.length(); i++ ){
+      sum += reviews[i].rating;
+    }
+    ob.rating = sum/reviews.length();
+  }
+
+
 
   const product = await Products.create(ob);
   if ( !product ){
@@ -111,7 +127,8 @@ const addProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   const {
     price, discount, quantity, options, attributes, features, 
-    returnPolicy, name, shortName, category, description
+    returnPolicy, name, shortName, category, description, review, 
+    rating, totalReviews
   } = req.body;
 
   const {id:productId} = req.params;
@@ -121,15 +138,22 @@ const updateProduct = async (req, res) => {
   if ( shortName ) ob.shortName = shortName; 
   if ( price ) ob.price = price;
   if (description) ob.description = description;
-  if (options) ob.options = options;
+  if (options) ob.$push = {...ob.$push, options: [...options]};
   if (attributes) ob.attributes = attributes;
   if (quantity) ob.quantity = quantity;
   if (category) ob.category = category;
-  if (features) ob.features = features;
+  if (features) ob.$push = {...ob.$push, features: [...features]};
   if (discount) ob.discount = discount;
   if ( returnPolicy ) ob.returnPolicy = returnPolicy;
+  if ( review ){
+    ob.$push = {
+      reviews: review,
+    }
+    ob.rating = rating;
+    ob.totalReviews = totalReviews;
+  }
 
-  const product = await Products.findByIdAndUpdate(productId, ob);
+  const product = await Products.findByIdAndUpdate(productId, ob, {new:true});
   if ( !product ){
     throw new CustomError("Error in updating a product");
   }

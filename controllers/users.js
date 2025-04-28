@@ -15,12 +15,13 @@ const signIn = async (req, res) => {
   if (!user) {
     throw new BadRequest('User not found');
   }
-  const valid = await bcrypt.compare(user.password, password);
+
+  const valid = await bcrypt.compare(password, user.password);
   if (!valid){
     throw new BadRequest('Password not correct');
   }
   const token = jwt.sign(
-    {userId:user._id, name:user.name},
+    {userId:user._id},
     process.env.JWT_SECRET, 
     {expiresIn: process.env.JWT_LIFETIME}
   );
@@ -38,7 +39,7 @@ const signUp = async (req, res) => {
     throw new BadRequest('user name is not provided');
   if ( !email)
     throw new BadRequest('Email not provided');
-  if ( password)
+  if ( !password)
     throw new BadRequest('Password not provided');
   if ( !country)
     throw new BadRequest('Country not provided');
@@ -59,7 +60,7 @@ const signUp = async (req, res) => {
   });
 
   const token = jwt.sign(
-    {userId:user._id, name:user.name}, 
+    {userId:user._id}, 
     process.env.JWT_SECRET, 
     {expiresIn:process.env.JWT_LIFETIME}
   );
@@ -72,11 +73,11 @@ const signUp = async (req, res) => {
 
 const changePassword = async (req, res) => {
   const {oldPassword, newPassword} = req.body; 
-  const {id:userId} = req.params; 
+  const {id} = req.params; 
   if ( !oldPassword || !newPassword){
     throw new BadRequest("Password must be provided to change password");
   }
-  const user = await Users.findById(userId);
+  const user = await Users.findById(id);
   const valid = await bcrypt.compare(oldPassword, user.password);
   if ( !valid ){
     throw new BadRequest("Password is not correct");
@@ -90,12 +91,13 @@ const changePassword = async (req, res) => {
 
 const sentOTP = async (req, res) => {
   const {email} = req.body;
+  console.log(email, "hi");
   const otp = generateOTP();
   if ( !email )
     throw new BadRequest("EMAIL must be provided");
   client.set(email, otp, {EX:2 * 60});
   const info = await transport.sendMail({
-    from: `ShopSphere <${process.env.EMAIL}>`, 
+    from: `ShopSphere <${process.env.USER_EMAIL}>`, 
     to: email, 
     subject: 'Verification OTP', 
     html: `Your otp code is <b>${otp}</b> </br> The otp will expire in two minutes`, 
@@ -110,15 +112,16 @@ const verifyOTP = async (req, res) => {
   if ( !email) 
     throw new BadRequest("EMAIL must be provided:verify otp");
   const storedOTP = await client.get(email);
-  if ( !storedOTP || storedOTP !== otp) {
-    throw new BadRequest("otp is either invalid or expired");
+  console.log(storedOTP, otp);
+  if ( !storedOTP || Number(storedOTP) !== Number(otp)) {
+    res.status(StatusCodes.BAD_REQUEST).json({verified:false, message: "verification unsuccessful"});   
   }
   res.status(StatusCodes.OK).json({verified:true, message: "Verification successful"});
 
 }
 
 const getAuthorizedUser = async (req, res) => {
-  const {userId, name} = req.user;
+  const {userId} = req.user;
   const user = await Users.findById(userId);
   if ( !user ){
     throw new Unauthorized("User not found by userId");
@@ -150,17 +153,20 @@ const getUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   const {id:userId} = req.params; 
+  
   const {name, email, country, state, city, cart, record} = req.body; 
   
+  console.log(cart);
   const ob = {};
   if ( name ) ob.name = name;
   if ( email ) ob.email = email;
   if ( country) ob.address = {...ob.address, country};
   if ( state) ob.address = {...ob.address, state};
   if ( city) ob.address = {...ob.address, city};
-  if ( cart) ob.cart = {$push: cart};
+  if ( cart) ob.$push = { cart: [...cart]};
+  if ( record ) ob.$push = {...ob.$push, record: [...record]};
   
-  const user = await Users.findByIdAndUpdate(userId, ob);
+  const user = await Users.findByIdAndUpdate(userId, ob, {new:true});
   if ( !user ){
     throw new BadRequest("ERROR IN UPDATING USER");
   }

@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+require('express-async-errors');
 const cors = require('cors');
 const http = require('http');
 const {Server} = require('socket.io');
@@ -7,7 +8,7 @@ const { userRouter, productRouter } = require('./routes');
 const { errorMiddleWare } = require('./middleware/errorMiddleware');
 const connectDB = require('./db/connect');
 const { connectRedis } = require('./redis');
-require('express-async-errors');
+
 
 const app = express();
 

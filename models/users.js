@@ -25,14 +25,12 @@ const userSchema = new mongoose.Schema({
     ],
     unique: true, 
   },
-  varified: {
-    type: Boolean,
-    default: false, 
-  }, 
   cart: [
     {
+      _id: false,
       productId: {type:mongoose.Types.ObjectId, required: [true, 'Product Id is necessar']}, 
-      billingAdress: addressSchema, 
+      optionNum: {type: Number, default: -1},
+      billingAddress: addressSchema, 
       price: {type:Number, required:true}, 
       quantity: {type:Number, default: 1}, 
       paymentMethod: {
@@ -45,7 +43,8 @@ const userSchema = new mongoose.Schema({
   record: [
     {
       productId: {type:mongoose.Types.ObjectId, required: [true, 'Product Id is necessar']}, 
-      billingAdress: addressSchema, 
+      optionNum: {type:Number, default: -1},
+      billingAddress: addressSchema, 
       price: {type:Number, required:true}, 
       quantity: {type:Number, default: 1}, 
       paymentMethod: {

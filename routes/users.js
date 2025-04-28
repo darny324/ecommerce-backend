@@ -7,7 +7,7 @@ const router = app.Router();
 
 router.route('/').get(getAllUsers);
 router.route('/authenticated-user').get(authorizationMiddleware, getAuthorizedUser);
-router.route('/send-otp').patch(sentOTP);
+router.route('/sent-otp').patch(sentOTP);
 router.route('/verify-otp').patch(verifyOTP);
 router.route('/auth/sign-up').post(signUp);
 router.route('/auth/sign-in').patch(signIn);

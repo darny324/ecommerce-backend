@@ -67,6 +67,7 @@ const productSchema = new mongoose.Schema({
       label: String, 
       price: Number, 
       quantity: Number, 
+      _id: false
     }
   ], 
   rating: {
@@ -79,6 +80,7 @@ const productSchema = new mongoose.Schema({
       userId: {type:mongoose.Types.ObjectId, required: true}, 
       review: {type:String}, 
       rating: {type:Number}, 
+      _id: false,
     }
   ], 
   totalReviews: {type:Number, default: 0}, 
