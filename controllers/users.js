@@ -5,7 +5,8 @@ const bcrypt = require('bcryptjs');
 const { generateOTP } = require("./methods");
 const {client} = require("../redis");
 const transport = require("../nodemailer");
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const Products = require("../models/products");
 
 
 
@@ -89,6 +90,7 @@ const changePassword = async (req, res) => {
   res.status(StatusCodes.OK).json({message:"success", user:user});
 }
 
+
 const sentOTP = async (req, res) => {
   const {email} = req.body;
   console.log(email, "hi");
@@ -154,7 +156,7 @@ const getUser = async (req, res) => {
 const updateUser = async (req, res) => {
   const {id:userId} = req.params; 
   
-  const {name, email, country, state, city, cart, record} = req.body; 
+  const {name, email, country, state, city, record} = req.body; 
   
   console.log(cart);
   const ob = {};
@@ -163,7 +165,6 @@ const updateUser = async (req, res) => {
   if ( country) ob.address = {...ob.address, country};
   if ( state) ob.address = {...ob.address, state};
   if ( city) ob.address = {...ob.address, city};
-  if ( cart) ob.$push = { cart: [...cart]};
   if ( record ) ob.$push = {...ob.$push, record: [...record]};
   
   const user = await Users.findByIdAndUpdate(userId, ob, {new:true});
@@ -184,5 +185,5 @@ const deleteUser = async (req, res) => {
 
 module.exports = {
   signUp, signIn, getAllUsers, getUser, updateUser, deleteUser, 
-  verifyOTP, sentOTP, changePassword, getAuthorizedUser
+  verifyOTP, sentOTP, changePassword, getAuthorizedUser, 
 }

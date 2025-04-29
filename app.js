@@ -31,6 +31,13 @@ const io = new Server(httpServer, {
 app.get('/', (req, res) => {
   res.send('<h1>HI from api</h1>')
 })
+app.get("/success", (req, res) => {
+  res.send("<h1>Success in purchasing</h1>");
+})
+
+app.get('/cancel', (req, res) => {
+  res.send("<h1>Cancel page</h1>");
+})
 
 app.use('/api/v1/ecommerce/users', userRouter);
 app.use('/api/v1/ecommerce/products', productRouter);

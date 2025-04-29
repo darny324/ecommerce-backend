@@ -25,23 +25,10 @@ const userSchema = new mongoose.Schema({
     ],
     unique: true, 
   },
-  cart: [
-    {
-      _id: false,
-      productId: {type:mongoose.Types.ObjectId, required: [true, 'Product Id is necessar']}, 
-      optionNum: {type: Number, default: -1},
-      billingAddress: addressSchema, 
-      price: {type:Number, required:true}, 
-      quantity: {type:Number, default: 1}, 
-      paymentMethod: {
-        type:String, 
-        enum: ["paypal", "credit-card"], 
-        default: "credit-card", 
-      }, 
-    }
-  ], 
   record: [
     {
+      _id: false,
+      purchaseAt: {type:Date},
       productId: {type:mongoose.Types.ObjectId, required: [true, 'Product Id is necessar']}, 
       optionNum: {type:Number, default: -1},
       billingAddress: addressSchema, 
@@ -49,8 +36,8 @@ const userSchema = new mongoose.Schema({
       quantity: {type:Number, default: 1}, 
       paymentMethod: {
         type:String, 
-        enum: ["paypal", "credit-card"], 
-        default: "credit-card", 
+        enum: ["paypal", "card"], 
+        default: "card", 
       }, 
     }
   ]

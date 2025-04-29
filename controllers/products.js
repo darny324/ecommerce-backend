@@ -3,25 +3,27 @@
 const { StatusCodes } = require("http-status-codes");
 const Products = require("../models/products");
 const {BadRequest, CustomError} = require('../errors');
+const {stripe} = require('../stripe');
+const Users = require("../models/users");
 
 //
 
 const getAllProducts = async (req, res) => {
-  const {name, numericFilters, 
-    brands, releaseYear, warranty, processor, ram, storage, batteryLife, 
+  const {name, ram, numericFilters, 
+    brands, releaseYear, warranty, processor, storage, batteryLife, 
     chargingType, resolution, material, category, sortBy
   } = req.query;
   const ob = {};
 
   if ( name ) {
-    ob.shortName = {$regex: name, $options: 'i'}; 
+    ob.name = {$regex: name, $options: 'i'}; 
   }
 
   if (brands) {
-    const b = brands.split(','); 
-    ob['attributes.brand'] = { $regex: [...b], $options: 'i'}
+    const b = brands.split(',').map(brand => new RegExp(brand, 'i'));
+    ob['attributes.brand'] = { $in: [...b]}
   };
-  if (releaseYear) { ob['attributes.releaseYear'] = releaseYear };
+  if (releaseYear) { ob['attributes.releaseYear'] = Number(releaseYear) };
   if (warranty) { ob['attributes.warranty'] = { $regex: warranty, $options: 'i'}};
   if (processor) { ob['attributes.processor'] = { $regex: processor, $options: 'i'}};
   if (ram) { ob['attributes.ram'] = { $regex: ram, $options: 'i'}};
@@ -105,14 +107,17 @@ const addProduct = async (req, res) => {
   if (discount) ob.discount = discount;
   if ( returnPolicy ) ob.returnPolicy = returnPolicy;
 
+
   if ( reviews ){
     ob.reviews = reviews;
-    ob.totalReviews = reviews.length();
-    let sum;
-    for ( let i = 0; i < reviews.length(); i++ ){
+    ob.totalReviews = reviews.length;
+    let sum = 0;
+    for ( let i = 0; i < reviews.length; i++ ){
       sum += reviews[i].rating;
     }
-    ob.rating = sum/reviews.length();
+    
+    ob.rating = sum/reviews.length;
+    console.log(ob.rating);
   }
 
 
@@ -126,9 +131,9 @@ const addProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   const {
-    price, discount, quantity, options, attributes, features, 
+    price, discount, quantity, options, features, 
     returnPolicy, name, shortName, category, description, review, 
-    rating, totalReviews
+    rating, totalReviews, attributes
   } = req.body;
 
   const {id:productId} = req.params;
@@ -139,10 +144,10 @@ const updateProduct = async (req, res) => {
   if ( price ) ob.price = price;
   if (description) ob.description = description;
   if (options) ob.$push = {...ob.$push, options: [...options]};
-  if (attributes) ob.attributes = attributes;
   if (quantity) ob.quantity = quantity;
   if (category) ob.category = category;
-  if (features) ob.$push = {...ob.$push, features: [...features]};
+  if ( attributes ) ob.attributes = attributes;
+  if (features) ob.features = features;
   if (discount) ob.discount = discount;
   if ( returnPolicy ) ob.returnPolicy = returnPolicy;
   if ( review ){
@@ -160,6 +165,68 @@ const updateProduct = async (req, res) => {
   res.status(StatusCodes.OK).json({product});
 }
 
+const purchaseProducts = async (req, res) => {
+  const {userId, products} = req.body;
+
+  const user = await Users.findById(userId);
+
+  const ids = products.map((p) => p._id);
+  const dbProducts = await Products.find({_id: {$in: ids}});
+  
+
+  const productMap = new Map();
+  dbProducts.map((p) => productMap.set(p._id, p));
+
+  const line_items = [];
+  for (const clientProduct of products) {
+    const product = productMap.get(clientProduct._id);
+    if ( !product ){
+      throw new BadRequest("No product exist with this id");
+    }
+    product.quantity -= clientProduct.quantity;
+    await product.save();
+
+    user.record.push(
+      {
+        productId: clientProduct._id, 
+        purchaseAt: Date.now(),
+        price: product.price, 
+        billingAddress: clientProduct.billingAddress ? clientProduct.billingAddress : user.address, 
+        quantity: clientProduct.quantity, 
+        paymentMethod: 'card', 
+        optionNum: -1, 
+      }
+    )
+    line_items.push(
+      {
+        quantity: clientProduct.quantity, 
+        price_data: {
+          currency: 'usd', 
+          product_data: {
+            name: product.name, 
+          }, 
+          unit_amount: product.price * 100,
+        }
+      }
+    )
+  }
+
+
+  const {url} = await stripe.checkout.session.create({
+    success_url: process.env.SUCCESS_URL,
+    cancel_url: process.env.CANCEL_URL,
+    line_items, 
+    mode: 'payment',
+  });
+
+  user.cart = [];
+  await user.save();
+
+  res.status(StatusCodes.OK).json({url});
+
+}
+
+
 const deleteProduct = async (req, res) => {
   const {id:productId} = req.params; 
   const product = await Products.findByIdAndDelete(productId);
@@ -174,5 +241,6 @@ module.exports = {
   getProduct, 
   addProduct, 
   updateProduct, 
-  deleteProduct
+  deleteProduct, 
+  purchaseProducts, 
 }
